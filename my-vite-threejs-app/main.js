@@ -17,7 +17,7 @@ const polygonPoints = [
 ];
 
 const geometry = new THREE.BufferGeometry().setFromPoints(polygonPoints);
-const material = new THREE.LineBasicMaterial({ color: 0xff0000, size: 0.1 });
+const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
 let pointsMesh = new THREE.LineLoop(geometry, material);
 scene.add(pointsMesh);
 
@@ -51,7 +51,7 @@ midpoints.forEach(point => {
 function createPolygon(points) {
   scene.remove(pointsMesh)
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const material = new THREE.LineBasicMaterial({ color: 0xff0000, size: 0.1 });
+  const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
   pointsMesh = new THREE.LineLoop(geometry, material);
   scene.add(pointsMesh);
 }
