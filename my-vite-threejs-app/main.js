@@ -1,51 +1,111 @@
 import '../my-vite-threejs-app/style.css';
 import * as THREE from 'three';
 
+
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
-console.log('renderer: ', renderer);
-
-renderer.setPixelRatio(window.devicePixelRatio);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-camera.position.setZ( scene, camera);
+document.body.appendChild(renderer.domElement);
 
-const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    const cube = new THREE.Mesh(geometry, material);
-    console.log('cube: ', cube);
-    scene.add(cube);
-    console.log('scene: ', scene);
-    
-    // Position the camera
-    camera.position.z = 5;
-    
-    // Create an animation loop
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene,camera);
-    } 
-    animate();
-// import javascriptLogo from './javascript.svg'
-// import viteLogo from '/vite.svg'
-// import { setupCounter } from './counter.js'
+const polygonPoints = [
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(2, 0, 0),
+  new THREE.Vector3(2, 2, 0),
+  new THREE.Vector3(0, 2, 0),
+];
 
-// document.querySelector('#app').innerHTML = `
-//   <div>
-//     <a href="https://vitejs.dev" target="_blank">
-//       <img src="${viteLogo}" class="logo" alt="Vite logo" />
-//     </a>
-//     <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-//       <img src="${javascriptLogo}" class="logo vanilla" alt="JavaScript logo" />
-//     </a>
-//     <h1>Hello Vite!</h1>
-//     <div class="card">
-//       <button id="counter" type="button"></button>
-//     </div>
-//     <p class="read-the-docs">
-//       Click on the Vite logo to learn more
-//     </p>
-//   </div>
-// `
+const geometry = new THREE.BufferGeometry().setFromPoints(polygonPoints);
+const material = new THREE.LineBasicMaterial({ color: 0xff0000, size: 0.1 });
+const pointsMesh = new THREE.LineLoop(geometry, material);
+scene.add(pointsMesh);
 
-// setupCounter(document.querySelector('#counter'))
+// Calculate and add midpoints
+const midpointGeometry = new THREE.BufferGeometry();
+const midpointMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.1 });
+const midpoints = [];
+
+for (let i = 0; i < polygonPoints.length; i++) {
+  const startPoint = polygonPoints[i];
+  const endPoint = polygonPoints[(i + 1) % polygonPoints.length]; // Wrap around to the first vertex for the last edge
+  
+  const midpoint = new THREE.Vector3();
+  midpoint.addVectors(startPoint, endPoint).multiplyScalar(0.5);
+  
+  midpoints.push(midpoint);
+}
+
+midpointGeometry.setFromPoints(midpoints);
+const midpointMesh = new THREE.Points(midpointGeometry, midpointMaterial);
+scene.add(midpointMesh);
+
+const mouse = new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
+let selectedPoint = null;
+let isDragging = false;
+
+renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+
+function onMouseDown(event) {
+  event.preventDefault();
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const polygonIntersects = raycaster.intersectObject(pointsMesh);
+  const midpointIntersects = raycaster.intersectObject(midpointMesh);
+
+  if (polygonIntersects.length > 0) {
+    isDragging = true;
+    selectedPoint = polygonIntersects[0].index;
+  } else if (midpointIntersects.length > 0) {
+    isDragging = true;
+    selectedPoint = midpointIntersects[0].index;
+  }
+}
+
+function onMouseUp() {
+  isDragging = false;
+  selectedPoint = null;
+}
+
+function onMouseMove(event) {
+  event.preventDefault();
+
+  if (isDragging) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersection = raycaster.intersectObject(pointsMesh);
+    if (intersection.length > 0) {
+      const newPosition = intersection[0].point;
+      if (selectedPoint < polygonPoints.length) {
+        geometry.attributes.position.setXYZ(selectedPoint, newPosition.x, newPosition.y, newPosition.z);
+        geometry.attributes.position.needsUpdate = true;
+      } else {
+        // Update midpoint position
+        midpoints[selectedPoint - polygonPoints.length].copy(newPosition);
+        midpointGeometry.attributes.position.setXYZ(selectedPoint - polygonPoints.length, newPosition.x, newPosition.y, newPosition.z);
+        midpointGeometry.attributes.position.needsUpdate = true;
+      }
+    }
+  }
+}
+
+camera.position.z = 5;
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+animate();
+
